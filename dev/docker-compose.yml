@@ -1,0 +1,36 @@
+name: chicago-raffle-application-dev
+
+services:
+  db:
+    image: "postgres:${PG_VERSION:-16}"
+    container_name: "${PG_CONTAINER_NAME:-raffle_db}"
+    restart: unless-stopped
+
+    # Environment variables consumed by the official postgres image.
+    # NOTE: password is NOT in the env; it's read from a file (see below).
+    environment:
+      POSTGRES_USER: ${PGUSER:?set in .env or shell}
+      POSTGRES_DB: ${PGDATABASE:?set in .env or shell}
+      POSTGRES_PASSWORD_FILE: /run/secrets/pg_password
+
+    # Expose the database to your host (left side can be changed if 5432 is taken)
+    ports:
+      - "${PG_PORT:-5432}:5432"
+
+    # Persist data and mount the password file (read-only)
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - type: bind
+        source: ${PGPASSWORD_FILE:-./.secrets/pg_password}
+        target: /run/secrets/pg_password
+        read_only: true
+
+    # Make your app wait until Postgres is ready
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PGUSER} -d ${PGDATABASE}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata: {}
